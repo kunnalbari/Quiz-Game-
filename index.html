@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ultimate Quiz Game</title>
+  <style>
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes glow { 0% { box-shadow: 0 0 10px gold; } 50% { box-shadow: 0 0 20px white; } 100% { box-shadow: 0 0 10px gold; } }
+    @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-5px); } 100% { transform: translateX(0); } }
+    
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      color: white;
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(to right, #667eea, #764ba2);
+      transition: background 0.5s;
+    }
+    
+    .container {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border-radius: 15px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+      animation: fadeIn 1s ease-in-out;
+      display: none;
+    }
+    
+    h1 { margin-bottom: 20px; }
+    
+    .question { font-size: 1.8em; margin: 15px 0; min-height: 60px; }
+    .progress, .timer, .lives, .level-display { font-size: 1.3em; margin: 10px 0; }
+    
+    .options button {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 12px;
+      border: none;
+      color: white;
+      font-size: 1.2em;
+      cursor: pointer;
+      margin: 5px 0;
+      width: 100%;
+      border-radius: 8px;
+      transition: all 0.3s ease-in-out;
+    }
+    
+    .options button:hover { background: gold; color: black; animation: glow 1s infinite; }
+    
+    .btn {
+      background: red;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      font-size: 1.2em;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    
+    .btn:hover { background: darkred; }
+    
+    .result, .final-msg, .game-over {
+      font-size: 1.8em;
+      display: none;
+      margin-top: 15px;
+    }
+    
+    .game-over { color: red; animation: shake 0.5s ease-in-out; }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>🔥 Ultimate Quiz Game 🔥</h1>
+    <button class="btn start">Start Game</button>
+  </div>
+
+  <div class="container">
+    <div class="level-display">🔹 Level: <span id="level">Easy</span></div>
+    <div class="timer">⏳ Time Left: <span id="time">30</span>s</div>
+    <div class="lives">❤️ Lives: <span id="lives">3</span></div>
+    <div class="progress">Question <span id="progress">1</span> of <span id="total">5</span></div>
+    <div class="question">Loading...</div>
+    <div class="options"></div>
+    <div class="result">🎉 Score: <span id="score">0</span></div>
+    <div class="final-msg"></div>
+    <div class="game-over">💀 Game Over! 💀</div>
+    <button class="btn restart" style="display: none;">Restart</button>
+  </div>
+
+  <script>
+    // Quiz questions for each level
+    const levels = {
+      easy: [
+        { q: "Capital of France?", o: ["Berlin", "Madrid", "Paris", "Lisbon"], a: "Paris" },
+        { q: "2 + 2 = ?", o: ["3", "4", "5", "6"], a: "4" },
+        { q: "Primary color?", o: ["Green", "Blue", "Orange", "Purple"], a: "Blue" },
+        { q: "Which animal barks?", o: ["Cat", "Dog", "Cow", "Fish"], a: "Dog" },
+        { q: "Opposite of up?", o: ["Down", "Left", "Right", "Forward"], a: "Down" }
+      ],
+      medium: [
+        { q: "Largest planet in our Solar System?", o: ["Earth", "Mars", "Jupiter", "Venus"], a: "Jupiter" },
+        { q: "Author of '1984'?", o: ["Orwell", "Shakespeare", "Twain", "Austen"], a: "Orwell" },
+        { q: "Square root of 81?", o: ["7", "8", "9", "10"], a: "9" },
+        { q: "Chemical symbol for Gold?", o: ["Ag", "Au", "Gd", "Go"], a: "Au" },
+        { q: "Speed of sound (approx.)?", o: ["340 m/s", "150 m/s", "450 m/s", "550 m/s"], a: "340 m/s" }
+      ],
+      hard: [
+        { q: "Speed of light?", o: ["299,792 km/s", "150,000 km/s", "100,000 km/s", "1,000,000 km/s"], a: "299,792 km/s" },
+        { q: "Quantum physics pioneer?", o: ["Einstein", "Newton", "Tesla", "Bohr"], a: "Bohr" },
+        { q: "Heaviest naturally occurring element?", o: ["Uranium", "Plutonium", "Osmium", "Lead"], a: "Uranium" },
+        { q: "Capital of Mongolia?", o: ["Ulaanbaatar", "Astana", "Tashkent", "Kabul"], a: "Ulaanbaatar" },
+        { q: "The hardest natural substance?", o: ["Diamond", "Ruby", "Sapphire", "Emerald"], a: "Diamond" }
+      ]
+    };
+
+    // Global variables
+    let quiz = [], currentLevel = "easy", qIndex = 0, score = 0, time = 30, lives = 3, timer;
+
+    // DOM elements
+    const startBtn = document.querySelector('.start'),
+          container = document.querySelector('.container'),
+          timerEl = document.getElementById('time'),
+          levelEl = document.getElementById('level'),
+          progressEl = document.getElementById('progress'),
+          totalEl = document.getElementById('total'),
+          questionEl = document.querySelector('.question'),
+          optionsEl = document.querySelector('.options'),
+          resultEl = document.querySelector('.result'),
+          finalMsgEl = document.querySelector('.final-msg'),
+          gameOverEl = document.querySelector('.game-over'),
+          scoreEl = document.getElementById('score'),
+          restartBtn = document.querySelector('.restart'),
+          livesEl = document.getElementById('lives');
+
+    // Sound effects (replace with valid audio file URLs or data URIs)
+    const correctSound = new Audio('correct.mp3'),
+          wrongSound   = new Audio('wrong.mp3'),
+          levelUpSound = new Audio('levelup.mp3'),
+          warningSound = new Audio('warning.mp3');
+
+    startBtn.onclick = () => {
+      startBtn.style.display = 'none';
+      container.style.display = 'block';
+      currentLevel = "easy";
+      levelEl.textContent = "Easy";
+      quiz = [...levels[currentLevel]];
+      totalEl.textContent = quiz.length;
+      startGame();
+    };
+
+    function startGame() {
+      qIndex = 0;
+      score = 0;
+      lives = 3;
+      livesEl.textContent = lives;
+      resultEl.style.display = 'block';
+      finalMsgEl.style.display = 'none';
+      gameOverEl.style.display = 'none';
+      restartBtn.style.display = 'none';
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      if (qIndex >= quiz.length) {
+        return nextLevel();
+      }
+      clearInterval(timer);
+      time = 30;
+      timerEl.style.color = "white";
+      timerEl.textContent = time;
+      startTimer();
+      progressEl.textContent = qIndex + 1;
+      questionEl.textContent = quiz[qIndex].q;
+      optionsEl.innerHTML = "";
+      quiz[qIndex].o.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.textContent = opt;
+        btn.onclick = () => checkAnswer(opt);
+        optionsEl.appendChild(btn);
+      });
+    }
+
+    function checkAnswer(selected) {
+      clearInterval(timer);
+      // Play sound effect
+      if (selected === quiz[qIndex].a) {
+        correctSound.play().catch(() => {});
+        score++;
+      } else {
+        wrongSound.play().catch(() => {});
+        lives--;
+        livesEl.textContent = lives;
+        if (lives <= 0) return endGame(false);
+      }
+      qIndex++;
+      setTimeout(loadQuestion, 500);
+    }
+
+    function startTimer() {
+      timer = setInterval(() => {
+        time--;
+        timerEl.textContent = time;
+        if (time <= 5) {
+          timerEl.style.color = "red";
+          warningSound.play().catch(() => {});
+        }
+        if (time <= 0) {
+          clearInterval(timer);
+          lives--;
+          livesEl.textContent = lives;
+          if (lives <= 0) return endGame(false);
+          qIndex++;
+          setTimeout(loadQuestion, 500);
+        }
+      }, 1000);
+    }
+
+    function nextLevel() {
+      clearInterval(timer);
+      if (currentLevel === "easy") {
+        currentLevel = "medium";
+      } else if (currentLevel === "medium") {
+        currentLevel = "hard";
+      } else {
+        return endGame(true);
+      }
+      levelUpSound.play().catch(() => {});
+      levelEl.textContent = currentLevel.charAt(0).toUpperCase() + currentLevel.slice(1);
+      quiz = [...levels[currentLevel]];
+      totalEl.textContent = quiz.length;
+      qIndex = 0;
+      setTimeout(loadQuestion, 1000);
+    }
+
+    function endGame(completed) {
+      clearInterval(timer);
+      questionEl.style.display = 'none';
+      optionsEl.style.display = 'none';
+      restartBtn.style.display = 'block';
+      resultEl.style.display = 'none';
+      if (completed) {
+        finalMsgEl.style.display = 'block';
+        finalMsgEl.textContent = "🏆 Congratulations! Final Score: " + score;
+      } else {
+        gameOverEl.style.display = 'block';
+      }
+    }
+
+    restartBtn.onclick = () => {
+      // Reset display for new game
+      questionEl.style.display = 'block';
+      optionsEl.style.display = 'block';
+      finalMsgEl.style.display = 'none';
+      gameOverEl.style.display = 'none';
+      startBtn.style.display = 'block';
+      container.style.display = 'none';
+    };
+  </script>
+</body>
+</html>
